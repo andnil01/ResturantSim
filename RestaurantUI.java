@@ -1,12 +1,12 @@
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
-import java.awt.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
 
 public class RestaurantUI extends JFrame {
     private final Restaurant restaurant;
@@ -71,7 +71,21 @@ public class RestaurantUI extends JFrame {
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 label.setText(value != null ? value.toString() : "");
                 label.setHorizontalAlignment(SwingConstants.CENTER);
-                return label; // Fjerner fargeendringer for enkelhet
+
+                // Endre farge basert på resultatet
+                if (column == 3) { // "Result"-kolonnen
+                    if ("Happy 😊".equals(value)) {
+                        label.setForeground(new Color(0, 128, 0)); // Grønn for fornøyde kunder
+                    } else if ("Angry 😣".equals(value)) {
+                        label.setForeground(new Color(200, 0, 0)); // Rød for sinte kunder
+                    } else {
+                        label.setForeground(Color.BLACK); // Standard farge
+                    }
+                } else {
+                    label.setForeground(Color.BLACK); // Standard farge for andre kolonner
+                }
+
+                return label;
             }
         });
 
@@ -112,7 +126,7 @@ public class RestaurantUI extends JFrame {
                 int activeCount = restaurant.getActiveOrderCount();
                 if (activeCount < 5) {
                     String randomName = realNames[random.nextInt(realNames.length)];
-                    long randomWaitTime = 15000 + random.nextInt(10000);
+                    long randomWaitTime = 10000 + random.nextInt(10000);
                     Customer customer = new Customer(randomName, restaurant, randomWaitTime, logger);
                     Order order = new Order(customer, Meal.values()[random.nextInt(Meal.values().length)]);
                     restaurant.addCustomer(customer);
