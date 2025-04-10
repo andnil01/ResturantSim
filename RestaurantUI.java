@@ -3,9 +3,9 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.Comparator;
 
@@ -32,10 +32,6 @@ public class RestaurantUI extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Initialize customerNameField and mealComboBox
-        customerNameField = new JTextField(20);
-        mealComboBox = new JComboBox<>(Meal.values());
-
         // Logger
         JTextArea logArea = new JTextArea();
         logArea.setEditable(false);
@@ -55,6 +51,27 @@ public class RestaurantUI extends JFrame {
         scorePanel.add(happyLabel);
         scorePanel.add(angryLabel);
 
+        // Bestillingspanel
+        JPanel orderPanel = new JPanel(new GridLayout(3, 2, 10, 10));
+        orderPanel.setBorder(BorderFactory.createTitledBorder("Place Order"));
+        orderPanel.setPreferredSize(new Dimension(250, 150));
+        orderPanel.setBackground(new Color(245, 245, 245));
+
+        JLabel nameLabel = new JLabel("Customer Name:");
+        customerNameField = new JTextField(realNames[random.nextInt(realNames.length)], 20);
+        JLabel mealLabel = new JLabel("Select Meal:");
+        mealComboBox = new JComboBox<>(Meal.values());
+        JButton placeOrderButton = new JButton("Place Order");
+        placeOrderButton.setBackground(new Color(50, 150, 50));
+        placeOrderButton.setForeground(Color.WHITE);
+
+        orderPanel.add(nameLabel);
+        orderPanel.add(customerNameField);
+        orderPanel.add(mealLabel);
+        orderPanel.add(mealComboBox);
+        orderPanel.add(new JLabel());
+        orderPanel.add(placeOrderButton);
+
         // Ordretabell
         String[] columns = {"Customer", "Meal", "Status", "Result"};
         tableModel = new DefaultTableModel(columns, 0);
@@ -65,7 +82,7 @@ public class RestaurantUI extends JFrame {
         orderTable.setShowGrid(true);
         JScrollPane tableScrollPane = new JScrollPane(orderTable);
 
-        // Tilpasset renderer for tydelig tekst
+        // Tilpasset renderer
         orderTable.setDefaultRenderer(Object.class, new TableCellRenderer() {
             private final JLabel label = new JLabel();
 
@@ -74,13 +91,20 @@ public class RestaurantUI extends JFrame {
                 label.setText(value != null ? value.toString() : "");
                 label.setHorizontalAlignment(SwingConstants.CENTER);
                 String status = (String) table.getValueAt(row, 2);
-                if ("Completed".equals(status)) {
+                String result = (String) table.getValueAt(row, 3);
+                if ("Left".equals(status) && result.contains("Angry")) {
+                    label.setBackground(new Color(255, 102, 102));
+                    label.setOpaque(true);
+                    label.setForeground(Color.BLACK);
                     label.setFont(new Font("SansSerif", Font.BOLD, 18));
-                    String result = (String) table.getValueAt(row, 3);
+                } else if ("Completed".equals(status)) {
+                    label.setFont(new Font("SansSerif", Font.BOLD, 18));
                     label.setForeground(result.contains("Happy") ? new Color(0, 128, 0) : new Color(200, 0, 0));
+                    label.setOpaque(false);
                 } else {
                     label.setFont(new Font("SansSerif", Font.PLAIN, 16));
                     label.setForeground(status.equals("Waiting") ? Color.BLUE : Color.ORANGE);
+                    label.setOpaque(false);
                 }
                 return label;
             }
@@ -92,18 +116,48 @@ public class RestaurantUI extends JFrame {
 
         // Layout
         add(scorePanel, BorderLayout.NORTH);
+        add(orderPanel, BorderLayout.WEST);
         add(tableScrollPane, BorderLayout.CENTER);
         add(logScrollPane, BorderLayout.SOUTH);
 
-        // Start the simulation
-        startSimulation();
-        }
+        // Håndter manuelle bestillinger
+        placeOrderButton.addActionListener(e -> {
+            String customerName = customerNameField.getText().trim();
+            Meal selectedMeal = (Meal) mealComboBox.getSelectedItem();
+            if (customerName.isEmpty()) {
+                logger.log("Error: Customer name cannot be empty!");
+                return;
+            }
+            long randomWaitTime = 15000 + random.nextInt(10000);
+            Customer customer = new Customer(customerName, restaurant, randomWaitTime, logger);
+            Order order = new Order(customer, selectedMeal);
+            restaurant.addCustomer(customer);
+            if (restaurant.placeOrder(order)) {
+                synchronized (orderStatuses) {
+                    orderStatuses.put(order, "Waiting");
+                    allOrders.add(order);
+                }
+                customer.addOrderAbandonedListener(o -> {
+                    synchronized (orderStatuses) {
+                        if (!"Completed".equals(orderStatuses.get(o))) {
+                            orderStatuses.put(o, "Left");
+                        }
+                    }
+                });
+                customer.start();
+                customerNameField.setText(realNames[random.nextInt(realNames.length)]);
+            }
+        });
 
-        private void startSimulation() {
+        // Start simulering
+        startSimulation();
+    }
+
+    private void startSimulation() {
         // Opprett kokker
         Cook cook1 = new Cook("Chef Mario", restaurant, logger);
         Cook cook2 = new Cook("Chef Bob", restaurant, logger);
-    
+
         cook1.addOrderTakenListener(order -> {
             synchronized (orderStatuses) {
                 orderStatuses.put(order, "Preparing");
@@ -114,7 +168,7 @@ public class RestaurantUI extends JFrame {
                 orderStatuses.put(order, "Preparing");
             }
         });
-    
+
         cook1.start();
         cook2.start();
 
@@ -122,18 +176,25 @@ public class RestaurantUI extends JFrame {
         new Thread(() -> {
             while (true) {
                 int activeCount = restaurant.getActiveOrderCount();
-            if (activeCount < 5) {
-                String randomName = realNames[random.nextInt(realNames.length)];
-                long randomWaitTime = 12000 + random.nextInt(10000); 
-                Customer customer = new Customer(randomName, restaurant, randomWaitTime, logger);
-                Order order = new Order(customer, Meal.values()[random.nextInt(Meal.values().length)]);
-                restaurant.addCustomer(customer);
-                if (restaurant.placeOrder(order)) {
-                    synchronized (orderStatuses) {
-                        orderStatuses.put(order, "Waiting");
-                        allOrders.add(order);
-                    }
-                    customer.start();
+                if (activeCount < 5) {
+                    String randomName = realNames[random.nextInt(realNames.length)];
+                    long randomWaitTime = 15000 + random.nextInt(10000);
+                    Customer customer = new Customer(randomName, restaurant, randomWaitTime, logger);
+                    Order order = new Order(customer, Meal.values()[random.nextInt(Meal.values().length)]);
+                    restaurant.addCustomer(customer);
+                    if (restaurant.placeOrder(order)) {
+                        synchronized (orderStatuses) {
+                            orderStatuses.put(order, "Waiting");
+                            allOrders.add(order);
+                        }
+                        customer.addOrderAbandonedListener(o -> {
+                            synchronized (orderStatuses) {
+                                if (!"Completed".equals(orderStatuses.get(o))) {
+                                    orderStatuses.put(o, "Left");
+                                }
+                            }
+                        });
+                        customer.start();
                     }
                 }
                 try {
@@ -144,25 +205,24 @@ public class RestaurantUI extends JFrame {
             }
         }).start();
 
-                // Oppdater tabell og resultattavle
-                // Oppdater tabell og resultattavle
+        // Oppdater tabell og resultattavle
         new Thread(() -> {
             while (true) {
                 happyLabel.setText("Happy Customers 😊: " + restaurant.getHappyCustomers());
                 angryLabel.setText("Angry Customers 😣: " + restaurant.getAngryCustomers());
-        
+
                 synchronized (orderStatuses) {
                     synchronized (tableModel) {
-                        tableModel.setRowCount(0); // Tøm og fyll på nytt
+                        tableModel.setRowCount(0); // Tøm tabellen og fyll på nytt
                         List<Order> active = new ArrayList<>(restaurant.getActiveOrders());
                         List<Order> completed = new ArrayList<>(allOrders);
-                        completed.removeAll(active); // Fullførte ordre
-        
+                        completed.removeAll(active); // Fullførte eller forlatte ordre
+
                         // Sorter aktive ordre (nyeste først)
                         active.sort(Comparator.comparing(Order::getCreationTime).reversed());
                         // Sorter fullførte ordre (eldste først)
                         completed.sort(Comparator.comparing(Order::getCreationTime));
-        
+
                         // Legg til aktive ordre øverst
                         for (Order order : active) {
                             String status = orderStatuses.getOrDefault(order, "Waiting");
@@ -173,27 +233,21 @@ public class RestaurantUI extends JFrame {
                                 "Waiting..."
                             });
                         }
-        
-                        // Legg til fullførte ordre under
+
+                        // Legg til fullførte eller forlatte ordre under
                         for (Order order : completed) {
-                            if (!"Completed".equals(orderStatuses.get(order)) && !"Left".equals(orderStatuses.get(order))) {
-                                if (order.getCustomer().isHappy()) {
-                                    orderStatuses.put(order, "Completed"); // Oppdater til Completed
-                                } else {
-                                    orderStatuses.put(order, "Left"); // Oppdater til Left
-                                }
-                            }
-                            String result = orderStatuses.get(order).equals("Completed") ? "Happy 😊" : "Angry 😣";
+                            String status = orderStatuses.getOrDefault(order, "Completed");
+                            String result = order.getCustomer().isHappy() ? "Happy 😊" : "Angry 😣";
                             tableModel.addRow(new Object[]{
                                 order.getCustomer().getName(),
                                 order.getMeal().getName(),
-                                orderStatuses.get(order), // Bruk statusen (Completed eller Left)
+                                status,
                                 result
                             });
                         }
                     }
                 }
-        
+
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
