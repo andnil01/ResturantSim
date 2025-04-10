@@ -66,12 +66,30 @@ public class RestaurantUI extends JFrame {
 
         orderTable.setDefaultRenderer(Object.class, new TableCellRenderer() {
             private final JLabel label = new JLabel();
-
+        
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 label.setText(value != null ? value.toString() : "");
                 label.setHorizontalAlignment(SwingConstants.CENTER);
-                return label; // Fjerner fargeendringer for enkelhet
+        
+                // Hent resultat fra Result-kolonnen
+                String result = (String) table.getValueAt(row, 3); // Result-kolonnen
+        
+                // Sett bakgrunnsfarge basert på resultat
+                if ("Happy 😊".equals(result)) {
+                    label.setBackground(new Color(144, 238, 144)); // Lys grønn
+                    label.setOpaque(true); // Gjør bakgrunnen synlig
+                    label.setForeground(Color.BLACK); // Svart tekst for kontrast
+                } else if ("Angry 😣".equals(result)) {
+                    label.setBackground(new Color(255, 102, 102)); // Lys rød
+                    label.setOpaque(true); // Gjør bakgrunnen synlig
+                    label.setForeground(Color.BLACK); // Svart tekst for kontrast
+                } else {
+                    label.setOpaque(false); // Fjern bakgrunn for andre rader
+                    label.setForeground(Color.BLACK); // Standard tekstfarge
+                }
+        
+                return label;
             }
         });
 
@@ -139,19 +157,18 @@ public class RestaurantUI extends JFrame {
             }
         }).start();
 
-        // Oppdater tabell og resultattavle
-        new Thread(() -> {
+                new Thread(() -> {
             while (true) {
                 happyLabel.setText("Happy Customers 😊: " + restaurant.getHappyCustomers());
                 angryLabel.setText("Angry Customers 😣: " + restaurant.getAngryCustomers());
-
+        
                 synchronized (orderStatuses) {
                     synchronized (tableModel) {
-                        tableModel.setRowCount(0);
+                        tableModel.setRowCount(0); // Tøm tabellen og fyll på nytt
                         List<Order> active = new ArrayList<>(restaurant.getActiveOrders());
                         List<Order> completed = new ArrayList<>(allOrders);
                         completed.removeAll(active);
-
+        
                         // Oppdater aktive ordre
                         for (Order order : active) {
                             String status = orderStatuses.getOrDefault(order, "Waiting");
@@ -162,23 +179,32 @@ public class RestaurantUI extends JFrame {
                                 "Waiting..."
                             });
                         }
-
+        
                         // Oppdater fullførte ordre
                         for (Order order : completed) {
-                            String status = orderStatuses.getOrDefault(order, "Completed");
-                            String result = order.getCustomer().isHappy() ? "Happy 😊" : "Angry 😣"; // Direkte fra isHappy()
+                            String status;
+                            String result;
+        
+                            if (order.getCustomer().isHappy()) {
+                                status = "Completed"; // Sett status til Completed for happy kunder
+                                result = "Happy 😊";
+                            } else {
+                                status = "Left"; // Sett status til Left for unhappy kunder
+                                result = "Angry 😣";
+                            }
+        
                             tableModel.addRow(new Object[]{
                                 order.getCustomer().getName(),
                                 order.getMeal().getName(),
-                                status,
-                                result
+                                status, // Oppdatert status
+                                result  // Oppdatert resultat
                             });
                         }
                     }
                 }
-
+        
                 try {
-                    Thread.sleep(500);
+                    Thread.sleep(500); // Oppdater hvert 500 ms
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
