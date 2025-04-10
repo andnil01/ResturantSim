@@ -31,6 +31,12 @@ public class Restaurant {
         }
     }
 
+    public void abandonOrder(Order order) {
+        synchronized (activeOrders) {
+            activeOrders.remove(order);
+        }
+    }
+
     public void addCustomer(Customer customer) {
         customers.add(customer);
     }

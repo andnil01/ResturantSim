@@ -20,8 +20,6 @@ public class Order {
     public Customer getCustomer() { return customer; }
     public Meal getMeal() { return meal; }
     public long getCreationTime() { return creationTime; }
-    public void complete() { 
-        latch.countDown(); 
-    }
+    public void complete() { latch.countDown(); }
     public void awaitCompletion() throws InterruptedException { latch.await(); }
 }

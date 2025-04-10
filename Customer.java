@@ -35,8 +35,9 @@ public class Customer extends Thread {
             } catch (InterruptedException e) {
                 logger.log(name + " gave up waiting and left unhappy!");
                 isHappy = false;
+                restaurant.abandonOrder(order); // Fjern fra activeOrders
                 if (orderAbandonedListener != null) {
-                    orderAbandonedListener.accept(order); // Varsle at kunden ga opp
+                    orderAbandonedListener.accept(order); // Oppdater status
                 }
                 Thread.currentThread().interrupt();
             }
